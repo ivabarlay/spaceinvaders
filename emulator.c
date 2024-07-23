@@ -53,6 +53,7 @@ uint8_t Parity8(uint16_t number){
 
 void Emulate8080p(State8080* state){
     unsigned char *opcode = &state -> memory[state -> pc];
+    uint32_t answer32;
     uint16_t answer; 
     uint16_t offset;
     uint16_t ret;
@@ -70,15 +71,32 @@ void Emulate8080p(State8080* state){
         // case 0x02:
         // case 0x03:
         // case 0x04:
-        // case 0x05:
-        // case 0x06:
+        case 0x05: // DCR B
+                   x = state->b - 1;
+                   state->cc.z = ((x & 0xFF) == 0);
+                   state->cc.s = ((x & 0x80) != 0);
+                   state->cc.p = Parity8(x & 0xFF);
+                   state->b = x;
+                   break;
+        case 0x06: // MVI B, D8
+                   state->b = opcode[1];
+                   state->pc += 1;
+                   break;
         // case 0x07:
         // case 0x08:
-        // case 0x09:
+        case 0x09: // DAD B
+                   answer32 = (uint32_t) ((state->h << 8) | state->l) + 
+                       (uint32_t) ((state->b << 8) | state->c);
+                   state->h = (answer32 & 0x0000FF00) >> 8;
+                   state->l = (answer32 & 0x000000FF);
+                   state->cc.cy = ((answer32 & 0xFFFF0000) > 0);
+                   break;
         // case 0x0a:
         // case 0x0b:
         // case 0x0c:
-        // case 0x0d:
+        case 0x0d: // DCR C
+
+                   break;
         // case 0x0e:
         case 0x0f: // RRC
                    x = state->a;
