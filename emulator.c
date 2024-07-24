@@ -51,6 +51,14 @@ uint8_t Parity8(uint16_t number){
     return (uint8_t) ((~res) & 1);
 }
 
+void LogicFlagsA(State8080 *state)
+{
+	state->cc.cy = state->cc.ac = 0;
+	state->cc.z = (state->a == 0);
+	state->cc.s = (0x80 == (state->a & 0x80));
+	state->cc.p = Parity8(state->a);
+}
+
 void Emulate8080p(State8080* state){
     unsigned char *opcode = &state -> memory[state -> pc];
     uint32_t answer32;
@@ -385,7 +393,9 @@ void Emulate8080p(State8080* state){
         // case 0xa4:
         // case 0xa5:
         // case 0xa6:
-        // case 0xa7:
+        case 0xa7: // ANA A
+                   state->a = state->a & state->a;
+                   break;
         // case 0xa8:
         // case 0xa9:
         // case 0xaa:
@@ -393,7 +403,9 @@ void Emulate8080p(State8080* state){
         // case 0xac:
         // case 0xad:
         // case 0xae:
-        // case 0xaf:
+        case 0xaf: // XRA A
+                   state->a = state->a ^ state->a;
+                   break;
         // case 0xb0:
         // case 0xb1:
         // case 0xb2:
@@ -428,13 +440,12 @@ void Emulate8080p(State8080* state){
         case 0xc3:  // JMP address
                    state->pc = (opcode[2] << 8) | opcode[1];
                    break;
-        case 0xc4: // PUSH B
+        // case 0xc4: 
+        case 0xc5: // PUSH B
                    state->memory[state->sp-1] = state->b;
                    state->memory[state->sp-2] = state->c;
                    state->sp = state->sp - 2;
                    break;
-        // case 0xc5:
-
         case 0xc6: // ADI byte
                    answer = (uint16_t) state->a + (uint16_t) opcode[1];    
                    state->cc.z = ((answer & 0xff) == 0);    
@@ -462,11 +473,21 @@ void Emulate8080p(State8080* state){
         // case 0xce:
         // case 0xcf:
         // case 0xd0:
-        // case 0xd1:
+        case 0xd1: // POP D
+                   state->e = state->memory[state->sp];
+                   state->d = state->memory[state->sp+1];
+                   state->sp += 2;
+                   break;
         // case 0xd2:
-        // case 0xd3:
+        case 0xd3: // OUT D8
+                   state->pc += 1;
+                   break;
         // case 0xd4:
-        // case 0xd5:
+        case 0xd5: // PUSH D
+                   state->memory[state->sp-1] = state->d;
+                   state->memory[state->sp-2] = state->e;
+                   state->sp = state->sp - 2;
+                   break;
         // case 0xd6:
         // case 0xd7:
         // case 0xd8:
@@ -478,11 +499,19 @@ void Emulate8080p(State8080* state){
         // case 0xde:
         // case 0xdf:
         // case 0xe0:
-        // case 0xe1:
+        case 0xe1: // POP H
+                   state->l = state->memory[state->sp];
+                   state->h = state->memory[state->sp+1];
+                   state->sp += 2;
+                   break;
         // case 0xe2:
         // case 0xe3:
         // case 0xe4:
-        // case 0xe5:
+        case 0xe5: // PUSH H
+                   state->memory[state->sp-1] = state->h;
+                   state->memory[state->sp-2] = state->l;
+                   state->sp = state->sp - 2;
+                   break;
         case 0xe6: // ANI byte
                    x = state->a & opcode[1];
                    state->cc.z = (x == 0);
@@ -496,7 +525,17 @@ void Emulate8080p(State8080* state){
         // case 0xe8:
         // case 0xe9:
         // case 0xea:
-        // case 0xeb:
+        case 0xeb: // XCHG
+                   {
+                       x = state->h;
+                       state->h = state->d;
+                       state->d = x;
+
+                       x = state->l;
+                       state->l = state->e;
+                       state->e = x;
+                   }
+                   break;
         // case 0xec:
         // case 0xed:
         // case 0xee:
@@ -527,7 +566,8 @@ void Emulate8080p(State8080* state){
         // case 0xf8:
         // case 0xf9:
         // case 0xfa:
-        // case 0xfb:
+        case 0xfb: // EI
+                   break;
         // case 0xfc:
         // case 0xfd:
         case 0xfe: // CPI byte
