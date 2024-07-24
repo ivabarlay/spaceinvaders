@@ -1,3 +1,4 @@
+#include "disassembler.c"
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -59,13 +60,15 @@ void LogicFlagsA(State8080 *state)
 	state->cc.p = Parity8(state->a);
 }
 
-void Emulate8080p(State8080* state){
-    unsigned char *opcode = &state -> memory[state -> pc];
+int Emulate8080p(State8080* state){
+    unsigned char *opcode = &state->memory[state -> pc];
     uint32_t answer32;
     uint16_t answer; 
     uint16_t offset;
     uint16_t ret;
     uint8_t x;
+
+    Disassemble8080Op(state->memory, state->pc);    
 
     state -> pc += 1;
 
@@ -395,6 +398,7 @@ void Emulate8080p(State8080* state){
         // case 0xa6:
         case 0xa7: // ANA A
                    state->a = state->a & state->a;
+                   LogicFlagsA(state);
                    break;
         // case 0xa8:
         // case 0xa9:
@@ -405,6 +409,7 @@ void Emulate8080p(State8080* state){
         // case 0xae:
         case 0xaf: // XRA A
                    state->a = state->a ^ state->a;
+                   LogicFlagsA(state);
                    break;
         // case 0xb0:
         // case 0xb1:
@@ -581,5 +586,52 @@ void Emulate8080p(State8080* state){
                    break;
         // case 0xff:
     }
+    printf("\t");
+	printf("%c", state->cc.z ? 'z' : '.');
+	printf("%c", state->cc.s ? 's' : '.');
+	printf("%c", state->cc.p ? 'p' : '.');
+	printf("%c", state->cc.cy ? 'c' : '.');
+	printf("%c  ", state->cc.ac ? 'a' : '.');
+	printf("A $%02x B $%02x C $%02x D $%02x E $%02x H $%02x L $%02x SP %04x PC %04x\n", state->a, state->b, state->c,
+				state->d, state->e, state->h, state->l, state->sp, state->pc);
+	return 0;
 }
 
+void ReadFileIntoMemoryAt(State8080* state, char* filename, uint32_t offset)
+{
+	FILE *f= fopen(filename, "rb");
+	if (f==NULL)
+	{
+		printf("error: Couldn't open %s\n", filename);
+		exit(1);
+	}
+	fseek(f, 0L, SEEK_END);
+	int fsize = ftell(f);
+	fseek(f, 0L, SEEK_SET);
+	
+	uint8_t *buffer = &state->memory[offset];
+	fread(buffer, fsize, 1, f);
+	fclose(f);
+}
+
+State8080* Init8080(void){
+    State8080* state = calloc(1, sizeof(State8080));
+    state->memory = malloc(0x10000); // 16K
+    return state;
+}
+
+int main(int argc, char *argv[])
+{
+    int done = 0;
+    State8080* state = Init8080();
+    ReadFileIntoMemoryAt(state, "roms/invaders.h", 0);
+    ReadFileIntoMemoryAt(state, "roms/invaders.g", 0x800);
+    ReadFileIntoMemoryAt(state, "roms/invaders.f", 0x1000);
+    ReadFileIntoMemoryAt(state, "roms/invaders.e", 0x1800);
+
+    while(done == 0){
+        done = Emulate8080p(state);
+    }
+
+    return 0;
+}
