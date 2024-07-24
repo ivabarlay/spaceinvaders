@@ -95,25 +95,50 @@ void Emulate8080p(State8080* state){
         // case 0x0b:
         // case 0x0c:
         case 0x0d: // DCR C
-
+                   x = state->c - 1;
+                   state->cc.z = ((x & 0xFF) == 0);
+                   state->cc.s = ((x & 0x80) != 0);
+                   state->cc.p = Parity8(x);
+                   state->c = x;
                    break;
-        // case 0x0e:
+        case 0x0e: // MVI C,D8
+                   state->c = opcode[1];
+                   state->pc += 1;
+                   break;
         case 0x0f: // RRC
                    x = state->a;
                    state->a = ((x >> 1) | ((x & 1) << 7));
                    state->cc.cy = (x & 1);
                    break;
         // case 0x10:
-        // case 0x11:
+        case 0x11: // LXI D,D16
+                   state->e = opcode[1];
+                   state->d = opcode[2];
+                   state->pc += 2;
+                   break;
         // case 0x12:
-        // case 0x13:
+        case 0x13: // INX D
+                   state->e++;
+                   if(state->e == 0){
+                       state->d++;
+                   }
+                   break;
         // case 0x14:
         // case 0x15:
         // case 0x16:
         // case 0x17:
         // case 0x18:
-        // case 0x19:
-        // case 0x1a:
+        case 0x19: // DAD D
+                   answer32 = (uint32_t) ((state->h << 8) | state->l) + 
+                       (uint32_t) ((state->d << 8) | state->e);
+                   state->h = (answer32 & 0x0000FF00) >> 8;
+                   state->l = (answer32 & 0x000000FF);
+                   state->cc.cy = ((answer32 & 0xFFFF0000) > 0);
+                   break;
+        case 0x1a: // LDAX D
+                   offset = (state->d << 8) | (state->e);
+                   state->a = state->memory[offset];
+                   break;
         // case 0x1b:
         // case 0x1c:
         // case 0x1d:
@@ -124,15 +149,33 @@ void Emulate8080p(State8080* state){
                    state->cc.cy = (x & 1);
                    break;
         // case 0x20:
-        // case 0x21:
+        case 0x21: // LXI H,D16
+                   state->l = opcode[1];
+                   state->h = opcode[2];
+                   state->pc +=2;
+                   break;
         // case 0x22:
-        // case 0x23:
+        case 0x23: // INX H
+                   state->l++;
+                   if(state->l == 0){
+                       state->h++;
+                   }
+                   break;
         // case 0x24:
         // case 0x25:
-        // case 0x26:
+        case 0x26: // MVI H,D8
+                   state->h = opcode[1];
+                   state->pc += 1;
+                   break;
         // case 0x27:
         // case 0x28:
-        // case 0x29:
+        case 0x29: // DAD H
+                   answer32 = (uint32_t) ((state->h << 8) | state->l) + 
+                       (uint32_t) ((state->h << 8) | state->l);
+                   state->h = (answer32 & 0x0000FF00) >> 8;
+                   state->l = (answer32 & 0x000000FF);
+                   state->cc.cy = ((answer32 & 0xFFFF0000) > 0);
+                   break;
         // case 0x2a:
         // case 0x2b:
         // case 0x2c:
@@ -142,20 +185,38 @@ void Emulate8080p(State8080* state){
                    state->a = ~state->a;
                    break;
         // case 0x30:
-        // case 0x31:
-        // case 0x32:
+        case 0x31: // LXI SP,D16
+                   state->sp = (opcode[2] << 8) | (opcode[1]);
+                   state->pc += 2;
+                   break;
+        case 0x32: // STA adr
+                   offset = (opcode[2] << 8) | (opcode[1]);
+                   state->memory[offset] = state->a;
+                   state->pc += 2;
+                   break;
         // case 0x33:
         // case 0x34:
         // case 0x35:
-        // case 0x36:
+        case 0x36: // MVI M,D8
+                   offset = (state->h << 8) | (state->l);
+                   state->memory[offset] = opcode[1];
+                   state->pc += 1;
+                   break;
         // case 0x37:
         // case 0x38:
         // case 0x39:
-        // case 0x3a:
+        case 0x3a: // LDA adr
+                   offset = (opcode[2] << 8) | (opcode[1]);
+                   state->a = state->memory[offset];
+                   state->pc += 2;
+                   break;
         // case 0x3b:
         // case 0x3c:
         // case 0x3d:
-        // case 0x3e:
+        case 0x3e: // MVI A,D8
+                   state->a = opcode[1];
+                   state->pc += 1;
+                   break;
         // case 0x3f:
         // case 0x40:
         case 0x41: state->b = state->c; break;
@@ -179,7 +240,10 @@ void Emulate8080p(State8080* state){
         // case 0x53:
         // case 0x54:
         // case 0x55:
-        // case 0x56:
+        case 0x56: // MOV D,M
+                   offset = (state->h << 8) | (state->l);
+                   state->d = state->memory[offset];
+                   break;
         // case 0x57:
         // case 0x58:
         // case 0x59:
@@ -187,7 +251,10 @@ void Emulate8080p(State8080* state){
         // case 0x5b:
         // case 0x5c:
         // case 0x5d:
-        // case 0x5e:
+        case 0x5e: // MOV E,M
+                   offset = (state->h << 8) | (state->l);
+                   state->e = state->memory[offset];
+                   break;
         // case 0x5f:
         // case 0x60:
         // case 0x61:
@@ -195,7 +262,10 @@ void Emulate8080p(State8080* state){
         // case 0x63:
         // case 0x64:
         // case 0x65:
-        // case 0x66:
+        case 0x66: // MOV H,M
+                   offset = (state->h << 8) | (state->l);
+                   state->h = state->memory[offset];
+                   break;
         // case 0x67:
         // case 0x68:
         // case 0x69:
@@ -204,7 +274,9 @@ void Emulate8080p(State8080* state){
         // case 0x6c:
         // case 0x6d:
         // case 0x6e:
-        // case 0x6f:
+        case 0x6f: // MOV L,A
+                   state->l = state->a;
+                   break;
         // case 0x70:
         // case 0x71:
         // case 0x72:
@@ -212,14 +284,26 @@ void Emulate8080p(State8080* state){
         // case 0x74:
         // case 0x75:
         // case 0x76:
-        // case 0x77:
+        case 0x77: // MOV M,A
+                   offset = (state->h << 8) | (state->l);
+                   state->memory[offset] = state->a;
+                   break;
         // case 0x78:
         // case 0x79:
-        // case 0x7a:
-        // case 0x7b:
-        // case 0x7c:
-        // case 0x7d:
-        // case 0x7e:
+        case 0x7a: // MOV A,D
+                   state->a = state->d;
+                   break;
+        case 0x7b: // MOV A,E
+                   state->a = state->e;
+                   break;
+        case 0x7c: // MOV A,H
+                   state->a = state->h;
+                   break;
+        // case 0x7d: 
+        case 0x7e: // MOV A,M
+                   offset = (state->h << 8) | (state->l);
+                   state->a = state->memory[offset];
+                   break;
         // case 0x7f:
         case 0x80: // ADD B
                    answer = (uint16_t) state->a + (uint16_t) state->b;
